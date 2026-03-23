@@ -1,0 +1,53 @@
+# ── Ambiente Python ──────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# ── Sicurezza — NON committare mai ───────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# Autenticazione
+.auth_hash
+.auth_hash_enc
+
+# ── Log e report ──────────────────────────────────────────────────────────
+audit_log.txt
+audit_log*.txt
+audit_log*.txt.*
+report_*.html
+
+# ── Checkpoint ────────────────────────────────────────────────────────────
+progress_checkpoint.txt
+
+# ── Supply chain ──────────────────────────────────────────────────────────
+.last_audit
+pip-audit-report.json
+requirements.txt.bak
+
+# ── IDE ───────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── OS ────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Test ──────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/

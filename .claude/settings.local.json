@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p C:/Users/loren/PycharmProjects/Organizza_Foto/agents/security)",
+      "Bash(mkdir -p C:/Users/loren/PycharmProjects/Organizza_Foto/agents/analysis)",
+      "Bash(mkdir -p C:/Users/loren/PycharmProjects/Organizza_Foto/agents/processing)",
+      "Bash(mkdir -p C:/Users/loren/PycharmProjects/Organizza_Foto/agents/output)",
+      "Bash(mkdir -p C:/Users/loren/PycharmProjects/Organizza_Foto/tests)",
+      "Bash(venv_organizza_foto\\\\Scripts\\\\python.exe -m pytest tests/ -v --tb=short 2>&1)",
+      "Bash(\"venv_organizza_foto/Scripts/python.exe\" -m pytest tests/ -v --tb=short)",
+      "Bash(\"venv_organizza_foto/Scripts/pip.exe\" install:*)",
+      "Bash(\"venv_organizza_foto/Scripts/pip-compile.exe\" --generate-hashes requirements.in -o requirements.txt)",
+      "Bash(\"venv_organizza_foto/Scripts/pip-compile.exe\" --generate-hashes --allow-unsafe requirements.in -o requirements.txt)",
+      "Bash(\"venv_organizza_foto/Scripts/python.exe\" -m pytest tests/ -v)"
+    ]
+  }
+}
