@@ -6,6 +6,7 @@ Entry point con PIL hardening, security gate completo e GUI tkinter.
 
 # ── FASE 1: PIL Hardening (PRIMA DI TUTTO) ────────────────────────────────
 import warnings
+import os
 from PIL import Image, ImageFile
 
 Image.MAX_IMAGE_PIXELS = 100_000_000  # 100 MP — decompression bomb protection
@@ -14,8 +15,6 @@ ImageFile.LOAD_TRUNCATED_IMAGES = False  # non caricare immagini troncate silenz
 
 # ── Import standard ────────────────────────────────────────────────────────
 import logging
-import os
-import sys
 import tkinter as tk
 from tkinter import messagebox
 
