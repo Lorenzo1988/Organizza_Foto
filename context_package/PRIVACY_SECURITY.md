@@ -300,7 +300,7 @@ piexif>=1.1.3    # per stripping GPS
 Assicurati che questi file NON siano mai committati:
 
 ```gitignore
-.env
+../.env
 .env.local
 *.env
 progress_checkpoint.txt

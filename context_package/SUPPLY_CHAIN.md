@@ -198,7 +198,7 @@ pip-audit-report.json
 venv/
 .venv/
 env/
-.env/
+../.env/
 __pycache__/
 *.pyc
 *.pyo
@@ -206,7 +206,7 @@ __pycache__/
 .Python
 
 # Sicurezza
-.env
+../.env
 .env.local
 .auth_hash
 audit_log.txt
