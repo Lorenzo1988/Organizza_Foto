@@ -80,20 +80,12 @@ def main():
         folder_manager=folder_manager_agent,
     )
 
-    # Avvia pipeline se SOURCE_FOLDER è configurato
-    if SOURCE_FOLDER and os.path.isdir(SOURCE_FOLDER) and DESTINATION_FOLDER:
-        logger.info("Avvio pipeline: %s → %s", SOURCE_FOLDER, DESTINATION_FOLDER)
-        try:
-            stats = orchestrator.run(SOURCE_FOLDER, DESTINATION_FOLDER)
-            logger.info("Pipeline completata: %s", stats)
-        except Exception as e:
-            logger.error("Errore pipeline: %s", e)
-
     # ── GUI ───────────────────────────────────────────────────────────────
     ui_agent = UIAgent(
         folder_manager_agent=folder_manager_agent,
         path_guard=path_guard,
         audit_logger=audit_logger,
+        orchestrator=orchestrator,
     )
     ui_agent.run()
 

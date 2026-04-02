@@ -5,7 +5,7 @@ GUI tkinter per visualizzare e organizzare le foto.
 import logging
 import os
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, filedialog
 
 from ui.components import (
     PhotoProgressBar, ToastNotification,
@@ -24,11 +24,17 @@ class UIAgent:
         folder_manager_agent=None,
         path_guard=None,
         audit_logger=None,
+        orchestrator=None,
     ):
         self.photo_manager = photo_manager
         self.folder_manager_agent = folder_manager_agent
         self.path_guard = path_guard
         self.audit_logger = audit_logger
+        self.orchestrator = orchestrator
+
+        import config as _cfg
+        self.source_folder = tk.StringVar(value=getattr(_cfg, 'SOURCE_FOLDER', ''))
+        self.dest_folder = tk.StringVar(value=getattr(_cfg, 'DESTINATION_FOLDER', ''))
 
         self.root = None
         self._toast = ToastNotification()
@@ -51,6 +57,7 @@ class UIAgent:
             f"x{getattr(__import__('config'), 'DEFAULT_HEIGHT', 900)}"
         )
 
+        self._build_folder_selector()
         self._build_header()
         self._build_main_area()
         self._build_action_bar()
@@ -59,6 +66,103 @@ class UIAgent:
         self.root.mainloop()
 
     # ── Build UI ──────────────────────────────────────────────────
+
+    def _build_folder_selector(self):
+        """Pannello per selezionare le cartelle sorgente e destinazione."""
+        panel = tk.Frame(self.root, bg=THEME['bg_secondary'], pady=8)
+        panel.pack(fill='x')
+
+        label_w = 12
+
+        # Riga sorgente
+        row1 = tk.Frame(panel, bg=THEME['bg_secondary'])
+        row1.pack(fill='x', padx=15, pady=2)
+        tk.Label(row1, text="Sorgente:", width=label_w, anchor='w',
+                 font=(FONTS['family'], FONTS['size_sm']),
+                 bg=THEME['bg_secondary'], fg=THEME['text_secondary']).pack(side='left')
+        tk.Entry(row1, textvariable=self.source_folder,
+                 font=(FONTS['family'], FONTS['size_sm']),
+                 bg=THEME['bg_tertiary'], fg=THEME['text_primary'],
+                 insertbackground=THEME['text_primary'], relief='flat',
+                 width=60).pack(side='left', padx=(0, 6))
+        tk.Button(row1, text="Sfoglia…",
+                  font=(FONTS['family'], FONTS['size_sm']),
+                  bg=THEME['accent_blue'], fg='white', relief='flat',
+                  cursor='hand2',
+                  command=lambda: self._browse_folder(self.source_folder)
+                  ).pack(side='left')
+
+        # Riga destinazione
+        row2 = tk.Frame(panel, bg=THEME['bg_secondary'])
+        row2.pack(fill='x', padx=15, pady=2)
+        tk.Label(row2, text="Destinazione:", width=label_w, anchor='w',
+                 font=(FONTS['family'], FONTS['size_sm']),
+                 bg=THEME['bg_secondary'], fg=THEME['text_secondary']).pack(side='left')
+        tk.Entry(row2, textvariable=self.dest_folder,
+                 font=(FONTS['family'], FONTS['size_sm']),
+                 bg=THEME['bg_tertiary'], fg=THEME['text_primary'],
+                 insertbackground=THEME['text_primary'], relief='flat',
+                 width=60).pack(side='left', padx=(0, 6))
+        tk.Button(row2, text="Sfoglia…",
+                  font=(FONTS['family'], FONTS['size_sm']),
+                  bg=THEME['accent_blue'], fg='white', relief='flat',
+                  cursor='hand2',
+                  command=lambda: self._browse_folder(self.dest_folder)
+                  ).pack(side='left')
+
+        # Pulsante Avvia
+        tk.Button(panel, text="▶  Avvia",
+                  font=(FONTS['family'], FONTS['size_sm'], FONTS['weight_bold']),
+                  bg=THEME['accent_green'], fg='white', relief='flat',
+                  cursor='hand2', padx=14, pady=4,
+                  command=self._run_pipeline
+                  ).pack(pady=(6, 0))
+
+    def _browse_folder(self, var: tk.StringVar):
+        """Apre il dialogo di selezione cartella e aggiorna la variabile."""
+        initial = var.get() if var.get() and os.path.isdir(var.get()) else '/'
+        chosen = filedialog.askdirectory(parent=self.root, initialdir=initial)
+        if chosen:
+            var.set(chosen)
+
+    def _run_pipeline(self):
+        """Esegue la pipeline con le cartelle selezionate."""
+        src = self.source_folder.get().strip()
+        dst = self.dest_folder.get().strip()
+
+        if not src or not os.path.isdir(src):
+            messagebox.showerror("Cartella non valida",
+                                 "Seleziona una cartella sorgente valida.",
+                                 parent=self.root)
+            return
+        if not dst:
+            messagebox.showerror("Cartella non valida",
+                                 "Seleziona una cartella di destinazione.",
+                                 parent=self.root)
+            return
+
+        if not self.orchestrator:
+            self._toast.show(self.root, "Orchestratore non disponibile", 'error')
+            return
+
+        if self.path_guard:
+            self.path_guard.add_allowed_root(src)
+            self.path_guard.add_allowed_root(dst)
+
+        try:
+            stats = self.orchestrator.run(src, dst)
+            self._stats['moved'] = stats.get('moved', 0)
+            self._stats['errors'] = stats.get('errors', 0)
+            self._update_status()
+            self._update_highlights_list()
+            self._toast.show(
+                self.root,
+                f"Pipeline completata: {stats.get('moved', 0)} foto organizzate",
+                'success'
+            )
+        except Exception as e:
+            logger.error("Errore pipeline: %s", e)
+            self._toast.show(self.root, f"Errore: {e}", 'error')
 
     def _build_header(self):
         header = tk.Frame(self.root, bg=THEME['bg_secondary'], height=60)
@@ -276,8 +380,7 @@ class UIAgent:
         if not self._highlights_list or not self.folder_manager_agent:
             return
         try:
-            import config
-            dest = getattr(config, 'DESTINATION_FOLDER', '')
+            dest = self.dest_folder.get().strip()
             if dest:
                 highlights = self.folder_manager_agent.get_existing_highlights(dest)
                 self._highlights_list.delete(0, tk.END)
