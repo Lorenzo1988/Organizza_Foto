@@ -16,7 +16,6 @@ ImageFile.LOAD_TRUNCATED_IMAGES = False  # non caricare immagini troncate silenz
 # ── Import standard ────────────────────────────────────────────────────────
 import logging
 import tkinter as tk
-from tkinter import messagebox
 
 # Configura logging dal .env
 from dotenv import load_dotenv
@@ -39,7 +38,6 @@ from config import (
 
 # ── Security Gate ─────────────────────────────────────────────────────────
 from agents.security.credential_guard import CredentialGuardAgent
-from agents.security.decompression_bomb_guard import DecompressionBombGuardAgent
 from agents.security.memory_manager import MemoryManagerAgent
 from agents.security.file_validator import FileValidatorAgent
 from agents.security.exif_sanitizer import ExifSanitizerAgent
@@ -49,7 +47,6 @@ from agents.security.anomaly_detector import AnomalyDetectorAgent
 from agents.security.gps_stripper import GpsStripperAgent
 from agents.security.xmp_stripper import XmpStripperAgent
 from agents.security.auth_agent import AuthenticationAgent
-from agents.security.dependency_audit import DependencyAuditAgent
 
 # ── Analysis ──────────────────────────────────────────────────────────────
 from agents.analysis.scanner import ScannerAgent
@@ -90,11 +87,7 @@ def main():
             logger.warning("CredentialGuard: %s", e)
         # Non blocca: usa i valori di default da config.py
 
-    # ── 2. PIL Hardening: configura DecompressionBombGuard ────────────────
-    bomb_guard = DecompressionBombGuardAgent(max_pixels=100_000_000)
-    bomb_guard.configure()  # già configurato sopra, ma lo applica anche all'agente
-
-    # ── 3. MemoryManagerAgent ─────────────────────────────────────────────
+    # ── 2. MemoryManagerAgent ─────────────────────────────────────────────
     memory_manager = MemoryManagerAgent(gc_every_n_photos=50)
 
     # ── 4. Path sicuri ────────────────────────────────────────────────────
@@ -116,17 +109,7 @@ def main():
     audit_logger = AuditLoggerAgent(log_path)
 
     # ── 6. AnomalyDetector ────────────────────────────────────────────────
-    def _on_anomaly(tipo, msg):
-        logger.warning("ANOMALIA [%s]: %s", tipo, msg)
-        # In GUI: mostrerà toast — collegato in UIAgent
-
-    anomaly_detector = AnomalyDetectorAgent(alert_callback=_on_anomaly)
-
-    # ── 7. DependencyAudit ────────────────────────────────────────────────
-    dep_audit = DependencyAuditAgent(app_dir=APP_DIR, audit_logger=audit_logger)
-    vulns = dep_audit.run()
-    if vulns:
-        logger.warning(dep_audit.format_warning(vulns))
+    anomaly_detector = AnomalyDetectorAgent()  # callback impostato dopo l'avvio GUI
 
     # ── 8. Autenticazione ─────────────────────────────────────────────────
     auth = AuthenticationAgent(app_dir=APP_DIR)
@@ -203,9 +186,8 @@ def main():
     )
 
     # ── 14. UI Agent ──────────────────────────────────────────────────────
-    root.deiconify()  # Mostra la finestra principale
+    root.destroy()  # chiude la finestra di auth — UIAgent crea il proprio Tk root
 
-    # Collega il toast dell'anomaly detector alla GUI
     ui_agent = UIAgent(
         folder_manager_agent=folder_manager_agent,
         path_guard=path_guard,
@@ -213,18 +195,13 @@ def main():
         anomaly_detector=anomaly_detector,
         memory_manager=memory_manager,
         audit_logger=audit_logger,
-        dependency_audit=dep_audit,
     )
-
-    # Aggiorna il callback anomaly per usare il toast della GUI
-    from ui.components import ToastNotification
-    toast = ToastNotification()
 
     def _on_anomaly_gui(tipo, msg):
         logger.warning("ANOMALIA [%s]: %s", tipo, msg)
         try:
-            if root.winfo_exists():
-                toast.show(root, f"[{tipo}] {msg}", 'warning', 5000)
+            if ui_agent.root and ui_agent.root.winfo_exists():
+                ui_agent._toast.show(ui_agent.root, f"[{tipo}] {msg}", 'warning', 5000)
         except Exception:
             pass
 
