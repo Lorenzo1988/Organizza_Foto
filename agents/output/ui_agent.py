@@ -33,8 +33,10 @@ class UIAgent:
         self.orchestrator = orchestrator
 
         import config as _cfg
-        self.source_folder = tk.StringVar(value=getattr(_cfg, 'SOURCE_FOLDER', ''))
-        self.dest_folder = tk.StringVar(value=getattr(_cfg, 'DESTINATION_FOLDER', ''))
+        self._default_source = getattr(_cfg, 'SOURCE_FOLDER', '')
+        self._default_dest = getattr(_cfg, 'DESTINATION_FOLDER', '')
+        self.source_folder = None   # creato in run() dopo tk.Tk()
+        self.dest_folder = None
 
         self.root = None
         self._toast = ToastNotification()
@@ -46,6 +48,8 @@ class UIAgent:
     def run(self):
         """Avvia la GUI principale."""
         self.root = tk.Tk()
+        self.source_folder = tk.StringVar(master=self.root, value=self._default_source)
+        self.dest_folder = tk.StringVar(master=self.root, value=self._default_dest)
         self.root.title("📸 Photo Organizer v2")
         self.root.configure(bg=THEME['bg_primary'])
         self.root.minsize(
