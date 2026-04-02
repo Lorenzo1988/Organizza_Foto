@@ -1,10 +1,6 @@
 """
-UIAgent — Fase 6, step 35
-Wrappa la GUI tkinter esistente con le nuove funzionalità di sicurezza.
-- TUTTI i Image.open() passano per memory_manager.open_thumbnail()
-- MAI Image.open() diretto nella GUI
-- DependencyAuditAgent: mostra banner se CVE trovati
-- AnomalyDetector collegato al tasto delete e agli highlights
+UIAgent — versione essenziale
+GUI tkinter per visualizzare e organizzare le foto.
 """
 import logging
 import os
@@ -20,36 +16,23 @@ logger = logging.getLogger(__name__)
 
 
 class UIAgent:
-    """
-    Agente UI che wrappa e potenzia la GUI tkinter esistente.
-    Integra tutti gli agenti di sicurezza nella GUI.
-    """
-
-    SESSION_CHECK_INTERVAL_MS = 300_000  # 5 minuti
+    """Agente UI con GUI tkinter."""
 
     def __init__(
         self,
         photo_manager=None,
         folder_manager_agent=None,
         path_guard=None,
-        auth_agent=None,
-        anomaly_detector=None,
-        memory_manager=None,
         audit_logger=None,
-        dependency_audit=None,
     ):
         self.photo_manager = photo_manager
         self.folder_manager_agent = folder_manager_agent
         self.path_guard = path_guard
-        self.auth = auth_agent
-        self.anomaly_detector = anomaly_detector
-        self.memory_manager = memory_manager
         self.audit_logger = audit_logger
-        self.dependency_audit = dependency_audit
 
         self.root = None
         self._toast = ToastNotification()
-        self._stats = {'moved': 0, 'duplicates': 0, 'errors': 0}
+        self._stats = {'moved': 0, 'errors': 0}
         self._progress_bar = None
         self._info_bar = None
         self._status_bar = None
@@ -73,13 +56,6 @@ class UIAgent:
         self._build_action_bar()
         self._build_status_bar()
 
-        # Mostra banner CVE se ci sono vulnerabilità
-        self._check_dependency_audit()
-
-        # Configura timeout sessione
-        if self.auth:
-            self.root.after(self.SESSION_CHECK_INTERVAL_MS, self._check_session_timeout)
-
         self.root.mainloop()
 
     # ── Build UI ──────────────────────────────────────────────────
@@ -93,7 +69,6 @@ class UIAgent:
                  font=(FONTS['family'], FONTS['size_lg'], FONTS['weight_bold']),
                  bg=THEME['bg_secondary'], fg=THEME['accent_gold']).pack(side='left', padx=20, pady=10)
 
-        # Progress bar
         progress_frame = tk.Frame(header, bg=THEME['bg_secondary'])
         progress_frame.pack(side='left', fill='x', expand=True, padx=20)
 
@@ -106,7 +81,6 @@ class UIAgent:
         self._progress_bar = PhotoProgressBar(progress_frame, total=1)
         self._progress_bar.pack(fill='x', pady=2)
 
-        # Bottoni header (impostazioni, blocco)
         btn_frame = tk.Frame(header, bg=THEME['bg_secondary'])
         btn_frame.pack(side='right', padx=15)
 
@@ -116,19 +90,10 @@ class UIAgent:
             relief='flat', cursor='hand2'
         ).pack(side='left', padx=4)
 
-        if self.auth:
-            tk.Button(
-                btn_frame, text="🔒", font=(FONTS['family'], 14),
-                bg=THEME['bg_secondary'], fg=THEME['text_secondary'],
-                relief='flat', cursor='hand2',
-                command=self._lock_screen
-            ).pack(side='left', padx=4)
-
     def _build_main_area(self):
         main = tk.Frame(self.root, bg=THEME['bg_primary'])
         main.pack(fill='both', expand=True)
 
-        # Canvas foto (area principale)
         self.canvas = tk.Canvas(
             main, bg=THEME['bg_tertiary'],
             highlightthickness=0
@@ -136,7 +101,6 @@ class UIAgent:
         self.canvas.pack(side='left', fill='both', expand=True)
         self.canvas.bind('<Configure>', self._on_canvas_resize)
 
-        # Pannello destro (HIGHLIGHTS + MIGLIORI_ANNO)
         right = tk.Frame(main, bg=THEME['bg_secondary'], width=320)
         right.pack(side='right', fill='y')
         right.pack_propagate(False)
@@ -153,18 +117,6 @@ class UIAgent:
         )
         self._highlights_list.pack(fill='x', padx=10)
 
-        tk.Label(right, text="📅 MIGLIORI ANNO",
-                 font=(FONTS['family'], FONTS['size_sm'], FONTS['weight_bold']),
-                 bg=THEME['bg_secondary'], fg=THEME['accent_blue']).pack(pady=(15, 5))
-
-        tk.Button(
-            right, text="Genera raccolta",
-            font=(FONTS['family'], FONTS['size_sm']),
-            bg=THEME['accent_blue'], fg='white',
-            relief='flat', cursor='hand2'
-        ).pack(padx=10, fill='x')
-
-        # InfoBar sotto il canvas
         self._info_bar = InfoBar(self.root)
         self._info_bar.pack(fill='x')
 
@@ -216,8 +168,6 @@ class UIAgent:
 
         try:
             from send2trash import send2trash
-            if self.anomaly_detector:
-                self.anomaly_detector.on_delete(photo_path)
             if self.audit_logger:
                 self.audit_logger.log_delete(photo_path)
             send2trash(photo_path)
@@ -255,7 +205,6 @@ class UIAgent:
             else:
                 clean_name = name.strip()
 
-            # Crea PhotoMetadata temporanea per il folder_manager
             from core.orchestrator import PhotoMetadata
             from datetime import datetime
             meta = PhotoMetadata(
@@ -272,62 +221,33 @@ class UIAgent:
             logger.error("Errore highlight: %s", e)
             self._toast.show(self.root, f"Errore: {e}", 'error')
 
-    # ── Sessione ─────────────────────────────────────────────────
-
-    def _check_session_timeout(self):
-        """Controlla scadenza sessione ogni 5 minuti."""
-        if self.auth and not self.auth.is_session_valid():
-            self._lock_screen()
-        else:
-            if self.auth:
-                mins = self.auth.get_session_remaining_minutes()
-                if self._status_bar:
-                    self._status_bar.update_counts(session_minutes=mins)
-            self.root.after(self.SESSION_CHECK_INTERVAL_MS, self._check_session_timeout)
-
-    def _lock_screen(self):
-        """Mostra schermata di blocco."""
-        if not self.auth:
-            return
-        from ui.auth_dialogs import LockScreenDialog
-        dlg = LockScreenDialog(self.root, self.auth, self.anomaly_detector)
-        self.root.wait_window(dlg)
-        if dlg.result:
-            self.auth.refresh_session()
-            self.root.after(self.SESSION_CHECK_INTERVAL_MS, self._check_session_timeout)
-
     # ── Utilities ────────────────────────────────────────────────
 
     def _get_current_photo(self) -> str:
-        """Ritorna il path della foto corrente (da photo_manager se disponibile)."""
+        """Ritorna il path della foto corrente."""
         if self.photo_manager and hasattr(self.photo_manager, 'get_current_photo'):
             return self.photo_manager.get_current_photo()
         return ''
 
     def _load_photo(self, photo_path: str):
-        """
-        Carica una foto nel canvas.
-        USA SEMPRE memory_manager.open_thumbnail() — MAI Image.open() diretto.
-        """
+        """Carica una foto nel canvas."""
         if not photo_path or not self.canvas:
             return
 
-        if self.memory_manager:
-            thumbnail = self.memory_manager.open_thumbnail(
-                photo_path,
-                (self.canvas.winfo_width() or 800, self.canvas.winfo_height() or 600)
-            )
-        else:
-            # Fallback se memory_manager non disponibile
-            try:
-                from PIL import Image
-                with Image.open(photo_path) as img:
-                    img.thumbnail((800, 600))
-                    thumbnail = img.copy()
-            except Exception:
-                thumbnail = None
-
-        if thumbnail is None:
+        try:
+            from PIL import Image, ImageTk
+            with Image.open(photo_path) as img:
+                w = self.canvas.winfo_width() or 800
+                h = self.canvas.winfo_height() or 600
+                img.thumbnail((w, h))
+                thumbnail = img.copy()
+            self._photo_ref = ImageTk.PhotoImage(thumbnail)
+            self.canvas.delete('all')
+            cx = self.canvas.winfo_width() // 2
+            cy = self.canvas.winfo_height() // 2
+            self.canvas.create_image(cx, cy, image=self._photo_ref, anchor='center')
+        except Exception as e:
+            logger.debug("Errore visualizzazione foto: %s", e)
             self.canvas.delete('all')
             self.canvas.create_text(
                 self.canvas.winfo_width() // 2,
@@ -336,17 +256,6 @@ class UIAgent:
                 fill=THEME['accent_red'],
                 font=(FONTS['family'], FONTS['size_lg'])
             )
-            return
-
-        try:
-            from PIL import ImageTk
-            self._photo_ref = ImageTk.PhotoImage(thumbnail)
-            self.canvas.delete('all')
-            cx = self.canvas.winfo_width() // 2
-            cy = self.canvas.winfo_height() // 2
-            self.canvas.create_image(cx, cy, image=self._photo_ref, anchor='center')
-        except Exception as e:
-            logger.debug("Errore visualizzazione foto: %s", e)
 
     def _on_canvas_resize(self, event=None):
         """Ricarica la foto quando il canvas cambia dimensione."""
@@ -357,12 +266,9 @@ class UIAgent:
     def _update_status(self):
         """Aggiorna la status bar."""
         if self._status_bar:
-            session_mins = self.auth.get_session_remaining_minutes() if self.auth else -1
             self._status_bar.update_counts(
                 moved=self._stats.get('moved', 0),
-                duplicates=self._stats.get('duplicates', 0),
                 errors=self._stats.get('errors', 0),
-                session_minutes=session_mins,
             )
 
     def _update_highlights_list(self):
@@ -379,21 +285,3 @@ class UIAgent:
                     self._highlights_list.insert(tk.END, f"⭐ {h}")
         except Exception as e:
             logger.debug("Update highlights list error: %s", e)
-
-    def _check_dependency_audit(self):
-        """Mostra banner se ci sono CVE nelle dipendenze."""
-        if not self.dependency_audit:
-            return
-        try:
-            vulns = self.dependency_audit.run()
-            if vulns:
-                warning = self.dependency_audit.format_warning(vulns)
-                self._toast.show(
-                    self.root,
-                    f"⚠️ {len(vulns)} CVE trovati nelle dipendenze",
-                    'warning',
-                    duration_ms=8000
-                )
-                logger.warning(warning)
-        except Exception as e:
-            logger.debug("DependencyAudit in UI error: %s", e)
